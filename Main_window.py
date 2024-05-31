@@ -16,6 +16,10 @@ class Main_Window(QtWidgets.QMainWindow):
 
         self.setupUI()
 
+        #设置全局变量，我要改BUG了！
+        self.flag_camera = False
+        self.flag_video = False
+
         self.bottomLayout.addLayout(self.btnLayout)
         #设置定时器
         self.timer_camera = QtCore.QTimer()
@@ -28,16 +32,19 @@ class Main_Window(QtWidgets.QMainWindow):
         self.model = YOLO("model\yolov8n.pt")
 
         #放置待处理的图片
-        self.frameToanalyze = []
+        self.frameToanalyze_camera = []
+        self.frameToanalyze_video = []
 
         #启动处理帧独立线程
         Thread(target=self.frameAnalyzeThreadFunc,daemon=True).start()
+
+        Thread(target=self.frameAnalyzeThreadFunc_video,daemon=True).start()
 
 
 
     def setupUI(self):
         #大小，图标，界面标题
-        self.resize(1000,700)
+        self.resize(1100,700)
         self.setWindowTitle("YOLO识别系统-wushuyue")
         self.setWindowIcon(QtGui.QIcon("images\wushuyue.gif"))
 
@@ -79,11 +86,13 @@ class Main_Window(QtWidgets.QMainWindow):
 
         self.video_btn = QtWidgets.QPushButton("🎞️视频文件")
         self.video_btn.clicked.connect(self.getVideo)
+        self.video_btn.clicked.connect(self.ChangeFlag_video)
 
 
 
         self.cam_btn = QtWidgets.QPushButton("📹摄像头")
         self.cam_btn.clicked.connect(self.startCamera)
+        self.cam_btn.clicked.connect(self.ChangeFlag_camera)
 
 
         self.img_btn = QtWidgets.QPushButton("📷图片")
@@ -99,6 +108,13 @@ class Main_Window(QtWidgets.QMainWindow):
         self.btnLayout.addWidget(self.img_btn)
         self.btnLayout.addWidget(self.stop_btn)
 
+
+    def ChangeFlag_camera(self):
+        self.flag_camera = True
+
+    def ChangeFlag_video(self):
+        self.flag_video = True
+
     def getVideo(self):
         file_dialog = QtWidgets.QFileDialog()
         self.video_path = file_dialog.getOpenFileName(
@@ -109,8 +125,8 @@ class Main_Window(QtWidgets.QMainWindow):
         )[0]
         if self.video_path == "":
             return
-        self.cap = cv2.VideoCapture(self.video_path)
-        if not self.cap.isOpened():
+        self.cap_video = cv2.VideoCapture(self.video_path)
+        if not self.cap_video.isOpened():
             print("视频打开失败，请重试")
             return
         if self.timer_video.isActive() == False:
@@ -118,7 +134,7 @@ class Main_Window(QtWidgets.QMainWindow):
 
     
     def show_video(self):
-        ret,frame = self.cap.read()
+        ret,frame = self.cap_video.read()
 
         if not ret:
             return
@@ -130,14 +146,14 @@ class Main_Window(QtWidgets.QMainWindow):
         
         self.label_ori.setPixmap(QtGui.QPixmap.fromImage(qImage))
 
-        if not self.frameToanalyze:
-            self.frameToanalyze.append(frame)
+        if not self.frameToanalyze_video:
+            self.frameToanalyze_video.append(frame)
 
 
     def startCamera(self):
         # 打开摄像头
-        self.cap = cv2.VideoCapture(0,cv2.CAP_DSHOW)
-        if not self.cap.isOpened():
+        self.cap_camera = cv2.VideoCapture(0,cv2.CAP_DSHOW)
+        if not self.cap_camera.isOpened():
             print("摄像头打开失败，请检查设备")
             return
         #如果没启动，则启动（防止连续点击按钮造成启动多个定时器）
@@ -146,7 +162,7 @@ class Main_Window(QtWidgets.QMainWindow):
 
     def show_camera(self):
          # 读取视频流
-        ret,frame = self.cap.read()
+        ret,frame = self.cap_camera.read()
 
         if not ret:
             return
@@ -159,17 +175,17 @@ class Main_Window(QtWidgets.QMainWindow):
         
         self.label_ori.setPixmap(QtGui.QPixmap.fromImage(qImage))
 
-        if not self.frameToanalyze:
-            self.frameToanalyze.append(frame)
+        if not self.frameToanalyze_camera:
+            self.frameToanalyze_camera.append(frame)
 
     def frameAnalyzeThreadFunc(self):
         
         while True:
-            if not self.frameToanalyze:
+            if not self.frameToanalyze_camera:
                 time.sleep(0.01)
                 continue
             
-            frame = self.frameToanalyze.pop(0)
+            frame = self.frameToanalyze_camera.pop(0)
 
             results = self.model(frame)[0]
 
@@ -180,7 +196,27 @@ class Main_Window(QtWidgets.QMainWindow):
             
             self.label_result.setPixmap(QtGui.QPixmap.fromImage(qImage))
 
-            time.sleep(0.01)
+            time.sleep(0.02)
+
+    def frameAnalyzeThreadFunc_video(self):
+        
+        while True:
+            if not self.frameToanalyze_video:
+                time.sleep(0.01)
+                continue
+            
+            frame = self.frameToanalyze_video.pop(0)
+
+            results = self.model(frame)[0]
+
+            img = results.plot(line_width = 1)
+
+            qImage = QtGui.QImage(img.data,img.shape[1],img.shape[0],
+                             QtGui.QImage.Format.Format_RGB888)
+            
+            self.label_result.setPixmap(QtGui.QPixmap.fromImage(qImage))
+
+            time.sleep(0.03)
 
     
     def get_image(self):
@@ -212,8 +248,18 @@ class Main_Window(QtWidgets.QMainWindow):
 
         
     def stop(self):
-        self.timer_camera.stop()    #关闭定时器
-        self.cap.release()          #释放视频流
+        if self.flag_video:
+            self.timer_video.stop()
+            self.cap_video.release()
+            self.flag_video = False
+            time.sleep(0.3)
+            self.label_result.clear()
+
+        if self.flag_camera:
+            self.timer_camera.stop()    #关闭定时器
+            self.cap_camera.release()          #释放视频流
+            self.flag_camera = False
+
         self.label_ori.clear()
         self.label_result.clear()   #清空视频显示区域
 
