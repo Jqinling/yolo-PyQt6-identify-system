@@ -16,9 +16,10 @@ class Main_Window(QtWidgets.QMainWindow):
 
         self.setupUI()
 
-        #设置全局变量，我要改BUG了！
+        #设置全局变量，改BUG！
         self.flag_camera = False
         self.flag_video = False
+        self.flag_image = False
 
         self.bottomLayout.addLayout(self.btnLayout)
         #设置定时器
@@ -54,6 +55,7 @@ class Main_Window(QtWidgets.QMainWindow):
 
         mainLayout = QtWidgets.QVBoxLayout(self.centralWidget)
 
+
         #显示部分(上部分)
         self.topLayout = QtWidgets.QHBoxLayout()
         self.label_ori = QtWidgets.QLabel(self)
@@ -73,35 +75,64 @@ class Main_Window(QtWidgets.QMainWindow):
 
         groupBox = QtWidgets.QGroupBox(self)
 
+
         self.bottomLayout = QtWidgets.QHBoxLayout(groupBox)
         self.textLog = QtWidgets.QTextBrowser()
         self.bottomLayout.addWidget(self.textLog)
 
         self.textLog.setStyleSheet("border:1px solid black")
 
+
+        #制作控制台
+        self.model_label =QtWidgets.QLabel(self)
+        self.model_label.setText("选择模型")
+        self.model_label.setStyleSheet("border:0px")
+        self.model_label.setStyleSheet("font-size:20px")
+        self.bottomLayout.addWidget(self.model_label)
+
+        self.model_comba = QtWidgets.QComboBox(self)
+        self.model_comba.addItems(["yolov8n.pt","yolov8s.pt","yolov8m.pt"])
+        self.model_comba.setStyleSheet("font-size:15px")
+        self.model_comba.currentIndexChanged.connect(self.on_model_changed)
+        self.bottomLayout.addWidget(self.model_comba)
+
         mainLayout.addWidget(groupBox)
         
         #控制按钮
         self.btnLayout = QtWidgets.QVBoxLayout()
 
+        button_style = '''
+        QPushButton {  
+            border:1px solid gray;     /* 边框颜色和粗细 */  
+            border-radius: 8px;       /* 边框圆角 */  
+            padding: 5px 10px;         /* 内边距 */  
+            background-color: #f0f0f0; /* 背景颜色 */  
+            color: black;             /* 文字颜色 */  
+            font-size: 20px;          /* 字体大小 */  
+        } 
+        QPushButton:hover{
+            background-color : #e0e0e0;
+        }
+        '''
+
         self.video_btn = QtWidgets.QPushButton("🎞️视频文件")
         self.video_btn.clicked.connect(self.getVideo)
-        self.video_btn.clicked.connect(self.ChangeFlag_video)
-
-
+        self.video_btn.setStyleSheet(button_style)
 
         self.cam_btn = QtWidgets.QPushButton("📹摄像头")
         self.cam_btn.clicked.connect(self.startCamera)
         self.cam_btn.clicked.connect(self.ChangeFlag_camera)
-
+        self.cam_btn.setStyleSheet(button_style)
 
         self.img_btn = QtWidgets.QPushButton("📷图片")
         self.img_btn.clicked.connect(self.get_image)
-
+        self.img_btn.setStyleSheet(button_style)
 
 
         self.stop_btn = QtWidgets.QPushButton("🛑停止")
         self.stop_btn.clicked.connect(self.stop)
+        self.stop_btn.setStyleSheet(button_style)
+
 
         self.btnLayout.addWidget(self.cam_btn)
         self.btnLayout.addWidget(self.video_btn)
@@ -112,8 +143,6 @@ class Main_Window(QtWidgets.QMainWindow):
     def ChangeFlag_camera(self):
         self.flag_camera = True
 
-    def ChangeFlag_video(self):
-        self.flag_video = True
 
     def getVideo(self):
         file_dialog = QtWidgets.QFileDialog()
@@ -125,6 +154,7 @@ class Main_Window(QtWidgets.QMainWindow):
         )[0]
         if self.video_path == "":
             return
+        self.flag_video = True
         self.cap_video = cv2.VideoCapture(self.video_path)
         if not self.cap_video.isOpened():
             print("视频打开失败，请重试")
@@ -221,15 +251,19 @@ class Main_Window(QtWidgets.QMainWindow):
     
     def get_image(self):
         file_dialog = QtWidgets.QFileDialog()
-        image_path = file_dialog.getOpenFileName(
+        self.image_path = file_dialog.getOpenFileName(
             self,
             "选择你要上传的图片", # 标题
             'D:\\' ,       # 起始目录
             "图片类型 (*.png *.jpg *.bmp)" # 选择类型过滤项，过滤内容在括号中
         )[0]
-        if image_path == "":
+        if self.image_path == "":
             return
-        frame = cv2.imread(image_path)
+        self.flag_image = True
+        self.show_image()
+
+    def show_image(self):
+        frame = cv2.imread(self.image_path)
         frame = cv2.resize(frame,(520,400))
         frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         qImage = QtGui.QImage(frame.data,frame.shape[1],frame.shape[0],
@@ -244,24 +278,36 @@ class Main_Window(QtWidgets.QMainWindow):
             
         self.label_result.setPixmap(QtGui.QPixmap.fromImage(qImage))
 
-        
+        txt = self.model(frame)[0]
+        self.textLog.setText(str(txt))
 
         
     def stop(self):
         if self.flag_video:
             self.timer_video.stop()
-            self.cap_video.release()
             self.flag_video = False
-            time.sleep(0.3)
+            time.sleep(0.31)
             self.label_result.clear()
 
         if self.flag_camera:
             self.timer_camera.stop()    #关闭定时器
-            self.cap_camera.release()          #释放视频流
             self.flag_camera = False
+            time.sleep(0.31)
+            self.label_result.clear()
 
+        self.flag_image = False
         self.label_ori.clear()
         self.label_result.clear()   #清空视频显示区域
+        self.textLog.clear()
+
+    
+    def on_model_changed(self,index):
+        model_paths = ["model\yolov8n.pt","model\yolov8s.pt","model\yolov8m.pt"]
+        
+        model_path = model_paths[index]
+        self.model = YOLO(model_path)
+        if self.flag_image:
+            self.show_image()
 
                 
 
