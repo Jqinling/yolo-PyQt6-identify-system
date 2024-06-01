@@ -20,6 +20,11 @@ class Main_Window(QtWidgets.QMainWindow):
         self.flag_camera = False
         self.flag_video = False
         self.flag_image = False
+        #默认模式为目标检测
+        self.flag_mode_det = True
+
+        #默认模型大小为n（纳米）
+        self.model_scale = 0
 
         self.bottomLayout.addLayout(self.btnLayout)
         #设置定时器
@@ -45,7 +50,7 @@ class Main_Window(QtWidgets.QMainWindow):
 
     def setupUI(self):
         #大小，图标，界面标题
-        self.resize(1100,700)
+        self.resize(1100,600)
         self.setWindowTitle("YOLO识别系统-wushuyue")
         self.setWindowIcon(QtGui.QIcon("images\wushuyue.gif"))
 
@@ -73,33 +78,54 @@ class Main_Window(QtWidgets.QMainWindow):
 
         #结果与控制部分（下）
 
-        groupBox = QtWidgets.QGroupBox(self)
+        groupBox_left = QtWidgets.QGroupBox(self)
+        groupBox_right = QtWidgets.QGroupBox(self)
 
 
-        self.bottomLayout = QtWidgets.QHBoxLayout(groupBox)
-        self.textLog = QtWidgets.QTextBrowser()
-        self.bottomLayout.addWidget(self.textLog)
 
-        self.textLog.setStyleSheet("border:1px solid black")
-
+        self.bottomLayout_control = QtWidgets.QHBoxLayout(groupBox_left)
+        self.bottomLayout = QtWidgets.QVBoxLayout(groupBox_right)
 
         #制作控制台
+        #选择模型大小功能（目前只支持n和s大小）
+
+        self.white_add1 = QtWidgets.QLabel(self)
+        self.white_add2 = QtWidgets.QLabel(self)
+
         self.model_label =QtWidgets.QLabel(self)
-        self.model_label.setText("选择模型")
+        self.model_label.setText("模型大小：")
         self.model_label.setStyleSheet("border:0px")
         self.model_label.setStyleSheet("font-size:20px")
-        self.bottomLayout.addWidget(self.model_label)
+        self.bottomLayout_control.addWidget(self.model_label)
 
         self.model_comba = QtWidgets.QComboBox(self)
-        self.model_comba.addItems(["yolov8n.pt","yolov8s.pt","yolov8m.pt"])
+        self.model_comba.addItems(["yolov8n.pt","yolov8s.pt"])
         self.model_comba.setStyleSheet("font-size:15px")
         self.model_comba.currentIndexChanged.connect(self.on_model_changed)
-        self.bottomLayout.addWidget(self.model_comba)
+        self.bottomLayout_control.addWidget(self.model_comba)
+        
+        self.bottomLayout_control.addWidget(self.white_add1)
 
-        mainLayout.addWidget(groupBox)
+
+        #选择模式功能（目前可以支持目标检测和实例分割）
+        self.mode_label =QtWidgets.QLabel(self)
+        self.mode_label.setText("选择模式：")
+        self.mode_label.setStyleSheet("border:0px")
+        self.mode_label.setStyleSheet("font-size:20px")
+        self.bottomLayout_control.addWidget(self.mode_label)
+
+        self.mode_comba = QtWidgets.QComboBox(self)
+        self.mode_comba.addItems(["Object Detection","Segmentation"])
+        self.mode_comba.setStyleSheet("font-size:15px")
+        self.mode_comba.currentIndexChanged.connect(self.on_mode_changed)
+        self.bottomLayout_control.addWidget(self.mode_comba)
+
+        self.bottomLayout_control.addWidget(self.white_add2)
+
+        mainLayout.addWidget(groupBox_left)
         
         #控制按钮
-        self.btnLayout = QtWidgets.QVBoxLayout()
+        self.btnLayout = QtWidgets.QHBoxLayout()
 
         button_style = '''
         QPushButton {  
@@ -139,6 +165,10 @@ class Main_Window(QtWidgets.QMainWindow):
         self.btnLayout.addWidget(self.img_btn)
         self.btnLayout.addWidget(self.stop_btn)
 
+        self.bottomLayout.setSpacing(40)
+
+        mainLayout.addWidget(groupBox_right)
+
 
     def ChangeFlag_camera(self):
         self.flag_camera = True
@@ -160,7 +190,7 @@ class Main_Window(QtWidgets.QMainWindow):
             print("视频打开失败，请重试")
             return
         if self.timer_video.isActive() == False:
-            self.timer_video.start(25)
+            self.timer_video.start(27)
 
     
     def show_video(self):
@@ -188,7 +218,7 @@ class Main_Window(QtWidgets.QMainWindow):
             return
         #如果没启动，则启动（防止连续点击按钮造成启动多个定时器）
         if self.timer_camera.isActive() == False:
-            self.timer_camera.start(25)
+            self.timer_camera.start(27)
 
     def show_camera(self):
          # 读取视频流
@@ -219,7 +249,10 @@ class Main_Window(QtWidgets.QMainWindow):
 
             results = self.model(frame)[0]
 
-            img = results.plot(line_width = 1)
+            if self.flag_mode_det:
+                img = results.plot(line_width = 1)
+            else:
+                img = results.plot(line_width = 0)
 
             qImage = QtGui.QImage(img.data,img.shape[1],img.shape[0],
                              QtGui.QImage.Format.Format_RGB888)
@@ -239,8 +272,10 @@ class Main_Window(QtWidgets.QMainWindow):
 
             results = self.model(frame)[0]
 
-            img = results.plot(line_width = 1)
-
+            if self.flag_mode_det:
+                img = results.plot(line_width = 1)
+            else:
+                img = results.plot(line_width = 0)
             qImage = QtGui.QImage(img.data,img.shape[1],img.shape[0],
                              QtGui.QImage.Format.Format_RGB888)
             
@@ -272,43 +307,58 @@ class Main_Window(QtWidgets.QMainWindow):
 
         result = self.model(frame)[0]
 
-        img =result.plot(line_width = 2)
+        if self.flag_mode_det:
+            img =result.plot(line_width = 2)
+        else:
+            img = result.plot(line_width = 0)
         qImage = QtGui.QImage(img.data,img.shape[1],img.shape[0],
                              QtGui.QImage.Format.Format_RGB888)
             
         self.label_result.setPixmap(QtGui.QPixmap.fromImage(qImage))
 
-        txt = self.model(frame)[0]
-        self.textLog.setText(str(txt))
 
         
     def stop(self):
         if self.flag_video:
             self.timer_video.stop()
             self.flag_video = False
-            time.sleep(0.31)
+            time.sleep(0.35)
             self.label_result.clear()
 
         if self.flag_camera:
             self.timer_camera.stop()    #关闭定时器
             self.flag_camera = False
-            time.sleep(0.31)
+            time.sleep(0.35)
             self.label_result.clear()
 
         self.flag_image = False
         self.label_ori.clear()
         self.label_result.clear()   #清空视频显示区域
-        self.textLog.clear()
 
     
     def on_model_changed(self,index):
-        model_paths = ["model\yolov8n.pt","model\yolov8s.pt","model\yolov8m.pt"]
+        model_paths = ["model\yolov8n.pt","model\yolov8s.pt"]
         
         model_path = model_paths[index]
+        self.model_scale = index
+
         self.model = YOLO(model_path)
         if self.flag_image:
             self.show_image()
 
+    def on_mode_changed(self,index):
+        detection_paths=["model\yolov8n.pt","model\yolov8s.pt"]
+        segmentation_paths=["model\yolov8n-seg.pt","model\yolov8s-seg.pt"]
+        if index == 0:
+            self.flag_mode_det = True
+            mode_path = detection_paths[self.model_scale]
+            self.model = YOLO(mode_path)
+        elif index == 1:
+            self.flag_mode_det = False
+            mode_path = segmentation_paths[self.model_scale]
+            self.model = YOLO(mode_path)
+        if self.flag_image:
+            self.show_image()
                 
 
 if __name__ == '__main__':
