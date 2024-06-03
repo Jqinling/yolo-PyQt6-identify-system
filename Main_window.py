@@ -99,7 +99,7 @@ class Main_Window(QtWidgets.QMainWindow):
         self.bottomLayout_control.addWidget(self.model_label)
 
         self.model_comba = QtWidgets.QComboBox(self)
-        self.model_comba.addItems(["yolov8n.pt","yolov8s.pt"])
+        self.model_comba.addItems(["yolov10n.pt","yolov10s.pt"])
         self.model_comba.setStyleSheet("font-size:15px")
         self.model_comba.currentIndexChanged.connect(self.on_model_changed)
         self.bottomLayout_control.addWidget(self.model_comba)
@@ -322,7 +322,7 @@ class Main_Window(QtWidgets.QMainWindow):
         if self.flag_video:
             self.timer_video.stop()
             self.flag_video = False
-            time.sleep(0.35)
+            time.sleep(0.36)
             self.label_result.clear()
 
         if self.flag_camera:
@@ -337,12 +337,14 @@ class Main_Window(QtWidgets.QMainWindow):
 
     
     def on_model_changed(self,index):
-        model_paths = ["model\yolov8n.pt","model\yolov8s.pt"]
-        
-        model_path = model_paths[index]
-        self.model_scale = index
-
-        self.model = YOLO(model_path)
+        detection_paths=["model\yolov8n.pt","model\yolov8s.pt"]
+        segmentation_paths=["model\yolov8n-seg.pt","model\yolov8s-seg.pt"]
+        if self.flag_mode_det:
+            model_path = detection_paths[index]
+            self.model = YOLO(model_path)
+        else:
+            model_path = segmentation_paths[index]
+            self.model = YOLO(model_path)
         if self.flag_image:
             self.show_image()
 
