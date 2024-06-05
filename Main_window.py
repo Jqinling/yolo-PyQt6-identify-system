@@ -5,6 +5,7 @@ import sys
 
 #关闭yolo详细日志
 os.environ['YOLO_VERBOSE'] = 'False' #这段代码得写导入ultralytics之前,不然不生效
+from ultralytics import YOLOv10
 from ultralytics import YOLO
 
 
@@ -35,7 +36,7 @@ class Main_Window(QtWidgets.QMainWindow):
         self.timer_video.timeout.connect(self.show_video)
 
         # 加载模型
-        self.model = YOLO("model\yolov8n.pt")
+        self.model = YOLOv10("model\yolov10n.pt")
 
         #放置待处理的图片
         self.frameToanalyze_camera = []
@@ -337,11 +338,11 @@ class Main_Window(QtWidgets.QMainWindow):
 
     
     def on_model_changed(self,index):
-        detection_paths=["model\yolov8n.pt","model\yolov8s.pt"]
+        detection_paths=["model\yolov10n.pt","model\yolov10s.pt"]
         segmentation_paths=["model\yolov8n-seg.pt","model\yolov8s-seg.pt"]
         if self.flag_mode_det:
             model_path = detection_paths[index]
-            self.model = YOLO(model_path)
+            self.model = YOLOv10(model_path)
         else:
             model_path = segmentation_paths[index]
             self.model = YOLO(model_path)
@@ -349,12 +350,12 @@ class Main_Window(QtWidgets.QMainWindow):
             self.show_image()
 
     def on_mode_changed(self,index):
-        detection_paths=["model\yolov8n.pt","model\yolov8s.pt"]
+        detection_paths=["model\yolov10n.pt","model\yolov10s.pt"]
         segmentation_paths=["model\yolov8n-seg.pt","model\yolov8s-seg.pt"]
         if index == 0:
             self.flag_mode_det = True
             mode_path = detection_paths[self.model_scale]
-            self.model = YOLO(mode_path)
+            self.model = YOLOv10(mode_path)
         elif index == 1:
             self.flag_mode_det = False
             mode_path = segmentation_paths[self.model_scale]
